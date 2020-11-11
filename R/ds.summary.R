@@ -67,11 +67,13 @@
 ds.summary <- function(x=NULL, datasources=NULL){
 
   # look for DS connections
-  if(is.null(datasources)){
+  if(is.null(datasources))
+  {
     datasources <- datashield.connections_find()
   }
 
-  if(is.null(x)){
+  if(is.null(x))
+  {
     stop("Please provide the name of the input vector!", call.=FALSE)
   }
 
@@ -83,9 +85,12 @@ ds.summary <- function(x=NULL, datasources=NULL){
   obj2lookfor <- xnames$holders
 
   # check if the input object(s) is(are) defined in all the studies
-  if(is.na(obj2lookfor)){
+  if(is.na(obj2lookfor))
+  {
     defined <- isDefined(datasources, varname)
-  }else{
+  }
+  else
+  {
     defined <- isDefined(datasources, obj2lookfor)
   }
 
@@ -94,8 +99,10 @@ ds.summary <- function(x=NULL, datasources=NULL){
 
   # the input object must be a numeric or an integer vector
   # the input object must be a dataframe or a factor
-  if(!('data.frame' %in% typ) & !('character' %in% typ) & !('factor' %in% typ) & !('integer' %in% typ) & !('list' %in% typ) & !('logical' %in% typ) & !('matrix' %in% typ) & !('numeric' %in% typ)){
-    stop("The input object must be a 'data.frame', 'character', factor', 'integer', 'list', 'logical', 'matrix' or 'numeric'.", call.=FALSE)
+  # Modifications here for survival::Surv object
+  if(!('data.frame' %in% typ) & !('character' %in% typ) & !('factor' %in% typ) & !('integer' %in% typ) & !('list' %in% typ) & !('logical' %in% typ) & !('matrix' %in% typ) & !('numeric' %in% typ) & !('Surv' %in% typ) )
+  {
+      stop("The input object must be a 'data.frame', 'character', factor', 'integer', 'list', 'logical', 'matrix' or 'numeric' or 'Surv'.", call.=FALSE)
   }
 
   stdnames <- names(datasources)
@@ -203,6 +210,65 @@ ds.summary <- function(x=NULL, datasources=NULL){
     }
     names(finalOutput) <- stdnames
   }
+  
+  # Modifications here for survival::Surv object
+  #if("Surv" %in% typ)
+  #{
+    
+  #      for(i in 1:numsources)
+  #      {
+  #            # check validity
+  #            validity <- DSI::datashield.aggregate(datasources[i], as.symbol(paste0('isValidDS(', x, ')')))[[1]]
+
+  #            # if valid
+  #            if (validity)
+  #            {
+  #                # TODO: think about ds.summary() for Surv object
+  #                # a summary() of a Surv() object returns a table of time and status which could be potentially disclosive 
+  #                finalOutput <- "Summary of survival object is currently not allowed."     
+  #            }
+  #            else
+  #            {
+  #                finalOutput <- "Invalid object."    
+  #            }
+
+  #      }
+    
+  #}
+
+  # Modifications here for survival::Surv object
+  if("Surv" %in% typ)
+  {
+      for(i in 1:numsources)
+      {
+          validity <- DSI::datashield.aggregate(datasources[i], as.symbol(paste0('isValidDS(', x, ')')))[[1]]
+        
+          # if valid request and privacy preserving then
+          if(validity)
+          {
+              l <- DSI::datashield.aggregate(datasources[i], call('lengthDS', x))[[1]]
+              # q <- (DSI::datashield.aggregate(datasources[i], as.symbol(paste0('quantileMeanDS(', x, ')' ))))[[1]]
+              # can optionally return mean
+              # q <- (DSI::datashield.aggregate(datasources[i], as.symbol(paste0('meanDS(', x, ')' ))))[[1]][1]
+
+              # call summarySurvDS() 
+              #   aggregate function
+              #   this takes a Surv object, runs quantileMeanDS() on each of the columns, 
+              #   knit them together and return the result.
+              q <- (DSI::datashield.aggregate(datasources[i], as.symbol(paste0('summarySurvDS(', x, ')' ))))[[1]]
+            
+              stdsummary <- list('class'=typ, 'length'=l, 'time'=q$time, 'event'=q$event)
+              finalOutput[[i]] <- stdsummary
+          }
+          else
+          {
+              finalOutput[[i]] <- 'INVALID object!'
+          }
+      }
+      names(finalOutput) <- stdnames
+  }
+  
+  
 
   return(finalOutput)
 }
